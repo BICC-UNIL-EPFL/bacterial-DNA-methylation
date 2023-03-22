@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+# Generate a tab-delimited text file of gene names extracted from a GenBank reference file
+# Copyright (c) 2023 Christian Iseli, UNIL - EPFL Bioinformatics Competence Center
+use strict;
+use warnings;
+my $chr;
+my $start;
+my $end;
+my $strand;
+my $name;
+my $prod;
+print "Chromosome\tGene_Start\tGene_End\tStrand\tGene_ID\tGene_Product\n";
+while ( <> ) {
+  if (/^ID\s+([^;]+); SV (\d+)/) {
+    $chr = "$1.$2";
+    next;
+  }
+  if (/^FT   gene\s+(\d+)\.\.(\d+)/) {
+    $start = $1;
+    $end = $2;
+    $strand = "+";
+    next;
+  }
+  if (/^FT   gene\s+complement\((\d+)\.\.(\d+)\)/) {
+    $start = $1;
+    $end = $2;
+    $strand = "-";
+    next;
+  }
+  if (/^FT\s+\/gene="([^"]+)"/) {
+    $name = $1;
+    next;
+  }
+  if (/^FT\s+\/locus_tag="([^"]+)"/) {
+    $name = $1 unless defined $name;
+    next;
+  }
+  if (/^FT\s+\/product="(.+)$/) {
+    $prod = $1;
+    $prod =~ s/\s+$//s;
+    while ($prod !~ /"$/) {
+      $_ = <>;
+      s/\s+$//s;
+      s/^FT\s+//;
+      $prod .= " " . $_;
+    }
+    chop $prod;
+    next;
+  }
+  if (/^FT\s+\/translation/) {
+    if (defined $start) {
+      printf "%s\t%u\t%u\t%s\t%s\t%s\n", $chr, $start, $end, $strand, $name, $prod;
+    }
+    undef $start;
+    undef $end;
+    undef $strand;
+    undef $name;
+    undef $prod;
+    next;
+  }
+}
+exit 0;
+__END__
+ID   CP059041; SV 1; circular; genomic DNA; STD; PRO; 4006609 BP.
+XX
+FT   gene            1..1398
+FT                   /gene="dnaA"
+FT                   /locus_tag="H0N28_00005"
+FT   CDS             1..1398
+FT                   /codon_start=1
+FT                   /transl_table=11
+FT                   /gene="dnaA"
+FT                   /locus_tag="H0N28_00005"
+FT                   /product="chromosomal replication initiator protein DnaA"
+FT                   /note="Derived by automated computational analysis using
+FT                   gene prediction method: Protein Homology."
+FT                   /inference="COORDINATES: similar to AA
+FT                   sequence:RefSeq:YP_004996698.1"
+FT                   /protein_id="QNT81348.1"
+FT                   /translation="MLWTDCLTRLRQELSDNVFAMWIRPLVAEEVEGILRLYAPNPYWT
+FT                   RYIQENHLELISILAEQLSEGRVRQVEILVDSRPGSILSSSEQPATTTAALQTAPIPQP
+FT                   AKVKREPEPVANTAVSSKSSKKKLLNPQFTFSLFVEGRSNQMAAETCRKVLTQLGASQH
+FT                   NPLFLYGPTGLGKTHLMQAVGNALLQAKPNARVMYMTSESFVQDFVSSLQKGKVEEFKK
+FT                   NCRSLDLLLVDDIHLLAGKEASLVEFFYTFNALLDESKQIILTSDRYPKELTELDPRLV
+FT                   SRFSWGLSVGVEPPDIETRIEILLKKAENSGVDLPRNCALFIAQQVVANVRELEGALNK
+FT                   VVAISRFKGAPIDLDVVRESLKDVLAIRARTISVENIQRVVSEYFRIPLKELIGPKRTR
+FT                   IYARPRQLAMGLARELTGDSFPEIGMAFGGRDHSTVMHACEKVVSLREEDPIFDEDYKN
+FT                   LLRLLQS"
+FT   gene            complement(6778..7335)
+FT                   /locus_tag="H0N28_00030"
+FT   CDS             complement(6778..7335)
+FT                   /codon_start=1
+FT                   /transl_table=11
+FT                   /locus_tag="H0N28_00030"
+FT                   /product="VTT domain-containing protein"
+FT                   /note="Derived by automated computational analysis using
+FT                   gene prediction method: Protein Homology."
+FT                   /inference="COORDINATES: similar to AA
+FT                   sequence:RefSeq:WP_001009196.1"
+FT                   /protein_id="QNT81353.1"
+FT                   /translation="MNFIDFITNFEQFLPILIQEYGAWVYAILFLIIFSETAFVFMFFL
+FT                   PGDSLLLTVGALCSVVELMHLGYMITLLTVAATLGYIVNYSIGRHFGNRIFEAKSRFIK
+FT                   KEYLNKTNRYFLQHGGKTILLARFIPFARSFAPLAAGSSNMSYGKFLIYNVAGAILWIC
+FT                   ILLTAGYLFGHALIQVTDFVEN"

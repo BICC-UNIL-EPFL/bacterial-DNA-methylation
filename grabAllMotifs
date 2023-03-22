@@ -1,0 +1,268 @@
+#!/usr/bin/perl
+# Generate a tab-delimited text file of detected nucleotide modifications from the output
+# of the PacBio bacterial nt modification pipeline
+# Copyright (c) 2023 Christian Iseli, UNIL - EPFL Bioinformatics Competence Center
+use strict;
+use warnings;
+my $fa = "A118.fa";
+my @L = glob "*-met/motifs.gff";
+my @LM = glob "../AB2/*_motifs.csv NV*/motifs.csv";
+my %M = (
+  "AAGANNNNNNNRTTA" => [ qr /AAGA.......[AG]TTA/, 4, 15 ],
+  "CGGANBAVCR" => [ qr /CGGA.[CGT]A[ACG]C[AG]/, 4, 10 ],
+  "CGGATCAWNH" => [ qr /CGGATCA[AT].[ACT]/, 4, 10 ],
+  "CGGTGTNTY" => [ qr /CGGTGT.T[CT]/, 4, 9 ],
+  "CNNNGTRTAVCR" => [ qr /C...GT[AG]TA[ACG]C[AG]/, 6, 12 ],
+  "CTATCAV" => [ qr /CTATCA[ACG]/, 6, 7 ],
+  "CTGATCY" => [ qr /CTGATC[CT]/, 4, 7 ],
+  "DTGATCYGS" => [ qr /[AGT]TGATC[CT]G[CG]/, 4, 9 ],
+  "DVWTGATCT" => [ qr /[AGT][ACG][AT]TGATCT/, 6, 9 ],
+  "GAAAGC" => [ qr /GAAAGC/, 4, 6 ],
+  "GAAYNNNNNNRTTC" => [ qr /GAA[CT]......[AG]TTC/, 3, 14 ],
+  "GCGGTAMYD" => [ qr /GCGGTA[AC][CT][AGT]/, 3, 9 ],
+  "RGATCAG" => [ qr /[AG]GATCAG/, 3, 7 ],
+  "RGATCY" => [ qr /[AG]GATC[CT]/, 3, 6 ],
+  "SAGATCAH" => [ qr /[CG]AGATCA[ACT]/, 4, 8 ],
+  "TAAYNNNNNNNTCTT" => [ qr /TAA[CT].......TCTT/, 3, 15 ],
+  "TGGCCA" => [ qr /TGGCCA/, 4, 6 ],
+  "TNTNAATTNAAA" => [ qr /T.T.AATT.AAA/, 6, 12 ],
+  "TTTNAATTNANA" => [ qr /TTT.AATT.A.A/, 6, 12 ],
+  "TTTATAVCA" => [ qr /TTTATA[ACG]CA/, 1, 9 ],
+  "TTTRAATTNA" => [ qr /TTT[AG]AATT.A/, 6, 10 ],
+  "VAGCWGCTB" => [ qr /[ACG]AGC[AT]GCT[CGT]/, 4, 9 ],
+  "VGATCB" => [ qr /[ACG]GATC[CGT]/, 3, 6 ],
+  "WRGATCAHB" => [ qr /[AT][AG]GATCA[ACT][CGT]/, 4, 9 ] );
+my %MM;
+local *FD;
+for my $fm (@LM) {
+  open FD, $fm or die "Can't open $fm : $!";
+  while ( <FD> ) {
+    s/"//g;
+    my @F = split /,/;
+    next if $F[0] eq "motifString";
+    $MM{$F[0]} = [] unless defined $MM{$F[0]};
+    my $A = $MM{$F[0]};
+    if ($#$A < 0) {
+      push @$A, $F[1], $F[2];
+    } else {
+      if ($$A[1] ne $F[2]) {
+	$$A[1] = $F[2] if $$A[1] eq "modified_base";
+	$F[2] = $$A[1] if $F[2] eq "modified_base";
+      }
+      die "grmp $_" if $$A[0] ne $F[1] or $$A[1] ne $F[2];
+    }
+  }
+  close FD;
+}
+my %C;
+my %S;
+my @N;
+local *FD;
+my $cur;
+open FD, $fa or die "Can't open $fa : $!";
+while ( <FD> ) {
+  if (/^>(\S+)/) {
+    $cur = $1;
+    $S{$cur} = "";
+    next;
+  }
+  s/\s+$//s;
+  $S{$cur} .= uc;
+}
+close FD;
+my %P;
+foreach my $ac (keys %S) {
+  $P{$ac} = {};
+  foreach my $motif (keys %M) {
+    my $re = $M{$motif}->[0];
+    while ($S{$ac} =~ /$re/g) {
+      my $pos = $-[0];
+      $pos += $M{$motif}->[1];
+      if (defined $P{$ac}->{$pos}) {
+	my $A = $P{$ac}->{$pos};
+	push @$A, $motif, "+";
+      } else {
+	$P{$ac}->{$pos} = [ $motif, "+" ];
+      }
+    }
+    my $rc = reverse $S{$ac};
+    $rc =~ tr/ACGT/TGCA/;
+    while ($rc =~ /$re/g) {
+      my $pos = length($rc) - $+[0];
+      $pos += ($M{$motif}->[2] - $M{$motif}->[1]) + 1;
+      if (defined $P{$ac}->{$pos}) {
+	my $A = $P{$ac}->{$pos};
+	push @$A, $motif, "-";
+      } else {
+	$P{$ac}->{$pos} = [ $motif, "-" ];
+      }
+    }
+  }
+}
+foreach my $file (@L) {
+  open FD, $file or die "Can't open $file : $!";
+  my ($name) = $file =~ /^(.*)-met/;
+  $name =~ tr/-/_/;
+  push @N, $name;
+  while ( <FD> ) {
+    next if /^#/;
+    my @F = split /\t/;
+    my ($tag) = $F[8] =~ /context=([^;\s]+)/;
+    die "grmp $F[8]" unless defined $tag;
+    die "bad tag length $tag" if length($tag) != 41;
+    foreach my $motif (keys %M) {
+      my $s = substr $tag, (21 - $M{$motif}->[1]), $M{$motif}->[2];
+      next unless $s =~ $M{$motif}->[0];
+      my ($ipd) = $F[8] =~ /IPDRatio=([.\d]+)/;
+      my ($coverage) = $F[8] =~ /coverage=(\d+)/;
+      my $chr = $F[0];
+      $C{$chr} = {} unless defined $C{$chr};
+      $C{$chr}->{$F[3]} = {} unless defined $C{$chr}->{$F[3]};
+      $C{$chr}->{$F[3]}->{$name} = [ $motif, $ipd, $coverage, $F[5], $F[6] ];
+    }
+  }
+  close FD;
+}
+my @SN = sort @N;
+print "chr\tpos\tmotif\ttype\tmodpos\tstrand";
+foreach my $name (@SN) {
+  foreach my $part ("ipd", "coverage", "score") {
+    print "\t$part", "_$name";
+  }
+}
+print "\n";
+foreach my $chr (sort keys %P) {
+  my $h = $P{$chr};
+  foreach my $pos (sort { $a <=> $b } keys %$h) {
+    my @MA = @{$h->{$pos}};
+    while ($#MA >= 0) {
+      my $motif = shift @MA;
+      my $strand = shift @MA;
+      my $MMA = $MM{$motif};
+      print "$chr\t$pos\t$motif\t$$MMA[1]\t$$MMA[0]\t$strand";
+      foreach my $name (@SN) {
+	if (defined($C{$chr}) and defined($C{$chr}->{$pos}) and defined($C{$chr}->{$pos}->{$name})) {
+	  my $A = $C{$chr}->{$pos}->{$name};
+	  print "\t", $$A[1], "\t", $$A[2], "\t", $$A[3];
+	} else {
+	  print "\tNA\tNA\tNA";
+	}
+      }
+      print "\n";
+    }
+  }
+}
+exit 0;
+__END__
+==> 8577-AB-met/motifs.csv <==
+motifString,centerPos,modificationType,fraction,nDetected,nGenome,groupTag,partnerMotifString,meanScore,meanIpdRatio,meanCoverage,objectiveScore
+GAAAGC,4,m6A,0.76751316,1753,2284,GAAAGC,,491.1272,6.7024875,342.69083,678505.2
+
+==> 8580-AB-met/motifs.csv <==
+motifString,centerPos,modificationType,fraction,nDetected,nGenome,groupTag,partnerMotifString,meanScore,meanIpdRatio,meanCoverage,objectiveScore
+GAAAGC,4,m6A,0.7640105,1745,2284,GAAAGC,,375.82635,6.695751,255.24986,514721.22
+
+==> 8581-AB-met/motifs.csv <==
+motifString,centerPos,modificationType,fraction,nDetected,nGenome,groupTag,partnerMotifString,meanScore,meanIpdRatio,meanCoverage,objectiveScore
+GAAAGC,4,m6A,0.7749562,1770,2284,GAAAGC,,259.82657,6.7147584,170.61581,365600.06
+TNTNAATTNAAA,6,m6A,0.1773779,69,389,TNTNAATTNAAA,,243.84058,4.823044,183.59421,3547.8447
+
+==> 8582-AB-met/motifs.csv <==
+motifString,centerPos,modificationType,fraction,nDetected,nGenome,groupTag,partnerMotifString,meanScore,meanIpdRatio,meanCoverage,objectiveScore
+GAAYNNNNNNRTTC,3,m6A,0.73867595,424,574,GAAYNNNNNNRTTC,GAAYNNNNNNRTTC,337.13208,4.5068665,261.71698,108836.484
+VAGCWGCTB,4,m4C,0.34829932,512,1470,VAGCWGCTB,VAGCWGCTB,168.73242,2.8345902,247.96484,33436.89
+TNTNAATTNAAA,6,m6A,0.17480719,68,389,TNTNAATTNAAA,,322.13235,4.6099997,272.7353,4558.759
+
+==> ATCC17978-met/motifs.csv <==
+"motifString","centerPos","modificationType","fraction","nDetected","nGenome","groupTag","partnerMotifString","meanScore","meanIpdRatio","meanCoverage","objectiveScore"
+
+==> 8577-AB-met/motifs.gff <==
+##gff-version 3
+##source ipdSummary v2.0
+##sequence-region CP059041.1 1 4006609
+##sequence-region CP059042.1 1 16502
+CP059041.1	kinModCall	modified_base	1	1	38	-	.	coverage=193;context=TAAGCAGTCTGTCCAAAGCATNNNNNNNNNNNNNNNNNNNN;IPDRatio=1.54
+CP059041.1	kinModCall	modified_base	10	10	37	-	.	coverage=359;context=CAAGCGAGTTAAGCAGTCTGTCCAAAGCATNNNNNNNNNNN;IPDRatio=1.42
+CP059041.1	kinModCall	m6A	14	14	23	+	.	context=NNNNNNNATGCTTTGGACAGACTGCTTAACTCGCTTGCGAC;fracLow=0.22;coverage=365;IPDRatio=1.46;fracUp=0.39;frac=0.30;identificationQv=5
+CP059041.1	kinModCall	modified_base	24	24	41	+	.	coverage=386;context=CTTTGGACAGACTGCTTAACTCGCTTGCGACAAGAGCTCTC;IPDRatio=1.46
+CP059041.1	kinModCall	m4C	30	30	29	-	.	context=TTATCAGAGAGCTCTTGTCGCAAGCGAGTTAAGCAGTCTGT;fracLow=0.15;coverage=388;IPDRatio=1.36;fracUp=0.38;frac=0.26;identificationQv=26
+CP059041.1	kinModCall	modified_base	37	37	31	+	.	coverage=395;context=GCTTAACTCGCTTGCGACAAGAGCTCTCTGATAACGTCTTT;IPDRatio=1.36
+
+==> 8580-AB-met/motifs.gff <==
+##gff-version 3
+##source ipdSummary v2.0
+##sequence-region CP059041.1 1 4006609
+##sequence-region CP059042.1 1 16502
+CP059041.1	kinModCall	m6A	14	14	25	+	.	context=NNNNNNNATGCTTTGGACAGACTGCTTAACTCGCTTGCGAC;fracLow=0.19;coverage=258;IPDRatio=1.51;fracUp=0.41;frac=0.31;identificationQv=12
+CP059041.1	kinModCall	m4C	30	30	32	-	.	context=TTATCAGAGAGCTCTTGTCGCAAGCGAGTTAAGCAGTCTGT;fracLow=0.16;coverage=267;IPDRatio=1.41;fracUp=0.44;frac=0.30;identificationQv=14
+CP059041.1	kinModCall	modified_base	42	42	35	-	.	coverage=275;context=ATCGCAAAGACGTTATCAGAGAGCTCTTGTCGCAAGCGAGT;IPDRatio=1.44
+CP059041.1	kinModCall	modified_base	204	204	38	+	.	coverage=285;context=CAATTGTCAGAAGGGCGGGTGCGTCAGGTTGAAATTTTGGT;IPDRatio=1.47
+CP059041.1	kinModCall	modified_base	281	281	31	-	.	coverage=292;context=TAGGGGCAGTTTGTAAAGCTGCTGTAGTTGTTGCAGGCTGT;IPDRatio=1.39
+CP059041.1	kinModCall	modified_base	311	311	49	+	.	coverage=286;context=AACTGCCCCTATACCTCAACCTGCTAAGGTTAAAAGAGAAC;IPDRatio=1.59
+
+==> 8581-AB-met/motifs.gff <==
+##gff-version 3
+##source ipdSummary v2.0
+##sequence-region CP059041.1 1 4006609
+CP059041.1	kinModCall	m6A	14	14	42	+	.	context=NNNNNNNATGCTTTGGACAGACTGCTTAACTCGCTTGCGAC;fracLow=0.25;coverage=139;IPDRatio=1.87;fracUp=0.58;frac=0.43;identificationQv=28
+CP059041.1	kinModCall	modified_base	31	31	42	-	.	coverage=158;context=GTTATCAGAGAGCTCTTGTCGCAAGCGAGTTAAGCAGTCTG;IPDRatio=1.58
+CP059041.1	kinModCall	modified_base	66	66	36	+	.	coverage=147;context=GATAACGTCTTTGCGATGTGGATTCGCCCTTTAGTAGCTGA;IPDRatio=1.57
+CP059041.1	kinModCall	modified_base	162	162	33	+	.	coverage=129;context=ATTCAAGAGAATCATTTAGAGTTAATTTCTATATTGGCTGA;IPDRatio=1.55
+CP059041.1	kinModCall	modified_base	165	165	32	-	.	coverage=157;context=TGTTCAGCCAATATAGAAATTAACTCTAAATGATTCTCTTG;IPDRatio=1.49
+CP059041.1	kinModCall	modified_base	173	173	32	+	.	coverage=143;context=TCATTTAGAGTTAATTTCTATATTGGCTGAACAATTGTCAG;IPDRatio=1.49
+CP059041.1	kinModCall	modified_base	311	311	41	+	.	coverage=144;context=AACTGCCCCTATACCTCAACCTGCTAAGGTTAAAAGAGAAC;IPDRatio=1.65
+
+==> 8582-AB-met/motifs.gff <==
+##gff-version 3
+##source ipdSummary v2.0
+##sequence-region CP059041.1 1 4006609
+CP059041.1	kinModCall	modified_base	1	1	35	-	.	coverage=153;context=TAAGCAGTCTGTCCAAAGCATNNNNNNNNNNNNNNNNNNNN;IPDRatio=1.55
+CP059041.1	kinModCall	m6A	14	14	58	+	.	context=NNNNNNNATGCTTTGGACAGACTGCTTAACTCGCTTGCGAC;fracLow=0.34;coverage=275;IPDRatio=1.93;fracUp=0.59;frac=0.47;identificationQv=38
+CP059041.1	kinModCall	modified_base	31	31	31	-	.	coverage=299;context=GTTATCAGAGAGCTCTTGTCGCAAGCGAGTTAAGCAGTCTG;IPDRatio=1.41
+CP059041.1	kinModCall	modified_base	42	42	54	-	.	coverage=299;context=ATCGCAAAGACGTTATCAGAGAGCTCTTGTCGCAAGCGAGT;IPDRatio=1.60
+CP059041.1	kinModCall	modified_base	204	204	38	+	.	coverage=303;context=CAATTGTCAGAAGGGCGGGTGCGTCAGGTTGAAATTTTGGT;IPDRatio=1.48
+CP059041.1	kinModCall	modified_base	205	205	35	-	.	coverage=307;context=TACCAAAATTTCAACCTGACGCACCCGCCCTTCTGACAATT;IPDRatio=1.42
+CP059041.1	kinModCall	modified_base	214	214	44	+	.	coverage=304;context=AAGGGCGGGTGCGTCAGGTTGAAATTTTGGTAGATTCTCGT;IPDRatio=1.50
+
+==> ATCC17978-met/motifs.gff <==
+##gff-version 3
+##source ipdSummary v2.0
+##sequence-region CP059041.1 1 4006609
+##sequence-region CP059042.1 1 16502
+CP059041.1	kinModCall	m6A	14	14	35	+	.	coverage=87;context=NNNNNNNATGCTTTGGACAGACTGCTTAACTCGCTTGCGAC;IPDRatio=1.92;identificationQv=6
+CP059041.1	kinModCall	modified_base	97	97	33	+	.	coverage=127;context=TAGTAGCTGAAGAAGTAGAGGGGATACTACGTCTCTATGCT;IPDRatio=1.81
+CP059041.1	kinModCall	modified_base	543	543	41	-	.	coverage=145;context=AGTAAGGCATTACCAACTGCTTGCATTAAGTGAGTCTTACC;IPDRatio=1.73
+CP059041.1	kinModCall	m6A	846	846	54	-	.	coverage=149;context=GATAGCCCCCAGGAAAAACGAGAAACCAAACGAGGATCAAG;IPDRatio=1.95;identificationQv=4
+CP059041.1	kinModCall	m6A	882	882	75	+	.	coverage=146;context=CTATCAGTAGGTGTTGAACCACCTGATATTGAAACTCGAAT;IPDRatio=2.57;identificationQv=48
+CP059041.1	kinModCall	modified_base	936	936	31	+	.	coverage=147;context=AAAAAAGCTGAAAATAGTGGCGTTGATTTACCTAGAAACTG;IPDRatio=1.68
+
+Description   Symbol   Bases represented   Complementary bases
+                       No. A   C   G   T
+Adenine         A      1   A                  T
+Cytosine        C              C              G
+Guanine         G                  G          C
+Thymine         T                      T      A
+Uracil          U                      U      A
+Weak            W      2   A           T      W
+Strong          S              C   G          S
+Amino           M          A   C              K
+Keto            K                  G   T      M
+Purine          R          A       G          Y
+Pyrimidine      Y              C       T      R
+Not A           B      3       C   G   T      V
+Not C           D          A       G   T      H
+Not G           H          A   C       T      D
+Not T           V          A   C   G          B
+Any one base    N      4   A   C   G   T      N
+Zero            Z      0                      Z
+
+>CP059041.1 Acinetobacter baumannii strain ATCC17978 chromosome, complete genome
+ATGCTTTGGACAGACTGCTTAACTCGCTTGCGACAAGAGCTCTCTGATAACGTCTTTGCGATGTGGATTC
+GCCCTTTAGTAGCTGAAGAAGTAGAGGGGATACTACGTCTCTATGCTCCTAATCCTTATTGGACGCGTTA
+TATTCAAGAGAATCATTTAGAGTTAATTTCTATATTGGCTGAACAATTGTCAGAAGGGCGGGTGCGTCAG
+GTTGAAATTTTGGTAGATTCTCGTCCTGGTAGTATTTTGTCCTCTAGTGAACAGCCTGCAACAACTACAG
+CAGCTTTACAAACTGCCCCTATACCTCAACCTGCTAAGGTTAAAAGAGAACCGGAACCTGTTGCTAATAC
+TGCAGTTAGTTCTAAGAGTTCAAAAAAGAAACTATTAAATCCACAATTTACTTTTTCACTATTTGTTGAA
+GGCCGTTCTAACCAAATGGCAGCAGAAACCTGTAGAAAAGTATTAACACAGTTAGGTGCTTCTCAACATA
+ACCCTTTATTTTTATATGGTCCGACAGGTCTAGGTAAGACTCACTTAATGCAAGCAGTTGGTAATGCCTT
+ACTGCAAGCGAAGCCGAATGCAAGAGTCATGTATATGACTTCAGAAAGTTTTGTACAAGATTTTGTGAGC

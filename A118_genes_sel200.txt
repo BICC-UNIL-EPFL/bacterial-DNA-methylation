@@ -1,0 +1,29 @@
+Chromosome	Gene_Start	Gene_End	Strand	Gene_ID	Gene_Product
+CP059039.1	23810	24409	+	rrf	glutathione S-transferase family protein
+CP059039.1	24467	25162	-	H0N27_00110	TIGR04219 family outer membrane beta-barrel protein
+CP059039.1	164790	166052	+	ftsA	cell division protein FtsA
+CP059039.1	166217	167392	+	ftsZ	cell division protein FtsZ
+CP059039.1	189153	190445	+	H0N27_00855	3-deoxy-D-manno-octulosonic acid transferase
+CP059039.1	218366	219040	-	tenA	thiaminase II
+CP059039.1	233724	235022	+	H0N27_01040	FAD-dependent oxidoreductase
+CP059039.1	235027	235854	+	H0N27_01045	class I SAM-dependent methyltransferase
+CP059039.1	285763	287178	+	H0N27_01320	TolC family protein
+CP059039.1	287181	288398	+	H0N27_01325	efflux RND transporter periplasmic adaptor subunit
+CP059039.1	345690	346115	+	H0N27_01590	prepilin-type N-terminal cleavage/methylation domain-containing protein
+CP059039.1	346262	346513	+	rpsP	30S ribosomal protein S16
+CP059039.1	382551	382859	+	H0N27_01770	hypothetical protein
+CP059039.1	382895	384250	+	H0N27_01775	S8 family serine peptidase
+CP059039.1	1627238	1627663	-	H0N27_07590	DUF2750 domain-containing protein
+CP059039.1	1723723	1724637	+	H0N27_08050	LysR family transcriptional regulator
+CP059039.1	1724719	1725513	+	H0N27_08055	hypothetical protein
+CP059039.1	1754711	1760962	+	H0N27_08185	DUF637 domain-containing protein
+CP059039.1	1835487	1838597	+	adeB	multidrug efflux RND transporter permease subunit AdeB
+CP059039.1	1838745	1841006	-	H0N27_08520	excinuclease ABC subunit UvrA
+CP059039.1	2103408	2103656	-	H0N27_09780	hypothetical protein
+CP059039.1	2103915	2104100	+	H0N27_09785	hypothetical protein
+CP059039.1	2354613	2354900	-	H0N27_10980	hypothetical protein
+CP059039.1	2776319	2780005	+	metH	methionine synthase
+CP059039.1	3701656	3702453	+	ssuC	aliphatic sulfonate ABC transporter permease SsuC
+CP059039.1	3702467	3703267	+	H0N27_17245	ATP-binding cassette domain-containing protein
+CP059039.1	3728664	3729872	-	H0N27_17375	lytic murein transglycosylase
+CP059039.1	3730645	3731766	-	H0N27_17380	5-(carboxyamino)imidazole ribonucleotide synthase

@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+# Select specified lines from a tab-delimited text file of genes
+# Copyright (c) 2023 Christian Iseli, UNIL - EPFL Bioinformatics Competence Center
+use strict;
+use warnings;
+my $sel = "select.txt";
+my $lst = "CP059041_genes.txt";
+$lst = shift @ARGV if $#ARGV >= 0;
+my $flank = 0;
+$flank = shift @ARGV if $#ARGV >= 0;
+local *FD;
+my %P;
+open FD, $sel or die "Can't open $sel : $!";
+while ( <FD> ) {
+  my @F = split /\t/;
+  $P{$F[1]} = 1;
+}
+close FD;
+open FD, $lst or die "Can't open $lst : $!";
+$_ = <FD>;
+print;
+while ( <FD> ) {
+  my @F = split /\t/;
+  my $found;
+  for my $i (($F[1] - $flank) .. ($F[2] + $flank)) {
+    if (defined $P{$i}) {
+      $found = 1;
+      last;
+    }
+  }
+  print if defined $found;
+}
+close FD;
+exit 0;
+__END__
+==> select.txt <==
+CP059041.1	24370	TNTNAATTNAAA	+	1.48	387	39	1.80	322	72	4.62	156	171	4.11	241	233	2.63	202	87
+CP059041.1	24371	TNTNAATTNAAA	-	1.75	374	78	1.57	307	46	4.12	148	156	5.40	238	247	2.34	216	86
+CP059041.1	2120128	TNTNAATTNAAA	+	1.0	NA	NA	1.0	NA	NA	3.39	169	152	3.00	277	170	2.14	189	58
+CP059041.1	2120129	TNTNAATTNAAA	-	1.0	NA	NA	1.0	NA	NA	4.65	166	182	2.11	265	97	1.0	NA	NA
+CP059041.1	3461149	TNTNAATTNAAA	+	1.0	NA	NA	1.0	NA	NA	3.95	142	135	3.43	298	210	2.02	181	53
+CP059041.1	3461150	TNTNAATTNAAA	-	1.0	NA	NA	1.0	NA	NA	3.38	129	116	3.85	271	202	2.70	205	99
+CP059041.1	3497765	TNTNAATTNAAA	+	6.10	376	541	5.20	309	449	5.71	135	245	5.98	325	473	5.63	243	335
+CP059041.1	3497766	TNTNAATTNAAA	-	5.19	339	415	4.74	295	307	5.42	112	141	5.84	288	372	6.21	214	308
+CP059041.1	3556606	TNTNAATTNAAA	+	1.67	341	61	1.98	330	94	4.13	181	200	4.01	272	232	2.05	213	56
+CP059041.1	3556607	TNTNAATTNAAA	-	1.72	326	63	1.63	314	50	4.59	166	178	4.30	241	246	3.46	191	128
+
+==> CP059041_genes.txt <==
+CP059041.1	1	1398	+	dnaA	chromosomal replication initiator protein DnaA
+CP059041.1	1496	2644	+	H0N28_00010	DNA polymerase III subunit beta
+CP059041.1	2659	3741	+	recF	DNA replication/repair protein RecF
+CP059041.1	3794	6262	+	gyrB	DNA topoisomerase (ATP-hydrolyzing) subunit B
+CP059041.1	6300	6692	+	cybC	cytochrome b562
+CP059041.1	6778	7335	-	H0N28_00030	VTT domain-containing protein
+CP059041.1	7586	9517	-	H0N28_00035	ATP-binding cassette domain-containing protein
+CP059041.1	9774	10778	+	H0N28_00040	RND transporter
+CP059041.1	11034	12041	+	H0N28_00045	RND transporter
+CP059041.1	12384	13388	+	H0N28_00050	hypothetical protein

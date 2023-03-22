@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+# Generate a CSV file from a FASTA file to extract sequence name and length
+# Copyright (c) 2023 Christian Iseli, UNIL - EPFL Bioinformatics Competence Center
+use strict;
+use warnings;
+print "start,end\n";
+my $n;
+my $l;
+while ( <> ) {
+  if (/^>(\S+)/) {
+    print "$n,1,$l\n" if defined $n;
+    $n = $1;
+    $l = 0;
+    next;
+  }
+  s/\s+$//s;
+  $l += length;
+}
+print "$n,1,$l\n" if defined $n;
+exit 0;
+__END__
+4329-ABY.fa:>4329-ABY_chr1 circular DNA strain:"Acinetobacter baylyi (DSM 24193) (Biosafety class 1) = ADP1, BD413" LEN=3601936 [Acinetobacter baylyi]
+8577-AB.fa:>8577-AB_chr1 linear DNA strain:"AB5075" LEN=3973694 [A. baumannii]
+8577-AB.fa:>8577-AB_plasmid1 circular DNA strain:"AB5075" LEN=83727 [A. baumannii]
+8580-AB.fa:>8580-AB_chr1 linear DNA strain:"AB5075-T" LEN=3951424 [A. baumannii]
+8580-AB.fa:>8580-AB_plasmid1 circular DNA strain:"AB5075-T" LEN=83737 [A. baumannii]
+8581-AB.fa:>8581-AB_chr1 circular DNA strain:"29D2" LEN=3836524 [A. baumannii]
+8582-AB.fa:>8582-AB_chr1 circular DNA strain:"86II/2C" LEN=3937456 [A. baumannii]
+A118.fa:>CP059039.1 Acinetobacter baumannii strain A118 chromosome, complete genome
+ATCC17978.fa:>CP059041.1 Acinetobacter baumannii strain ATCC17978 chromosome, complete genome
+ATCC17978.fa:>CP059042.1 Acinetobacter baumannii strain ATCC17978 plasmid, complete sequence
+ATCC19606.fa:>CP059040.1 Acinetobacter baumannii strain ATCC19606 chromosome, complete genome
